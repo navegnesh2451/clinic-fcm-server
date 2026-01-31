@@ -2,11 +2,27 @@ const express = require("express");
 const admin = require("firebase-admin");
 const cors = require("cors");
 
-const serviceAccount = require("./serviceAccountKey.json");
+let serviceAccount;
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  } else {
+    try {
+      serviceAccount = require("./serviceAccountKey.json");
+    } catch (e) {
+      console.log("serviceAccountKey.json not found, waiting for Env Var...");
+    }
+  }
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+  if (serviceAccount) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+    console.log("✅ Firebase initialized successfully");
+  }
+} catch (error) {
+  console.log("⚠️ Firebase initialization failed:", error.message);
+}
 
 const app = express();
 app.use(cors());

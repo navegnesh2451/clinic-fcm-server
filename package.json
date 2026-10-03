@@ -4,19 +4,22 @@
   "scripts": {
     "serve": "firebase serve --only functions",
     "shell": "firebase functions:shell",
-    "start": "npm run shell",
+    "start": "node index.js",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log"
   },
   "engines": {
-    "node": "18"
+    "node": "20"
   },
   "main": "index.js",
   "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "firebase-admin": "^12.0.0",
-    "firebase-functions": "^5.0.0"
+    "firebase-functions": "^5.0.0",
+    "multer": "^2.0.0",
+    "nodemailer": "^6.9.14"
   },
   "devDependencies": {
     "firebase-functions-test": "^3.1.0"

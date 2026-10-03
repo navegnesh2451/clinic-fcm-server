@@ -239,7 +239,30 @@ function extFromName(name) {
   const m = /\.[A-Za-z0-9]{1,5}$/.exec(name || "");
   return m ? m[0].toLowerCase() : ".jpg";
 }
+function validateXrayPath(value) {
+  if (typeof value !== "string" || value.length > 512) {
+    return null;
+  }
 
+  // Only allow the expected patient/type/file structure.
+  const match = /^([^/\\]+)\/(old|new)\/([a-f0-9-]{36}\.(jpg|jpeg|png|webp))$/i.exec(value);
+
+  if (!match) return null;
+
+  const patientId = match[1];
+
+  // Reject traversal, encoded separators, and unsafe patient IDs.
+  if (
+    patientId === "." ||
+    patientId === ".." ||
+    patientId.includes("..") ||
+    /[%?#\x00-\x1f]/.test(patientId)
+  ) {
+    return null;
+  }
+
+  return { patientId, objectPath: value };
+}
 app.post("/xray-upload", requireAuth, upload.single("file"), async (req, res) => {
   try {
     if (!supabase) {
@@ -253,7 +276,24 @@ app.post("/xray-upload", requireAuth, upload.single("file"), async (req, res) =>
     if (!allowed) {
       return res.status(403).json({ success: false, error: "Not authorized for this patient" });
     }
-    const safeType = type === "old" ? "old" : "new";
+    if (!allowed) {
+  return res.status(403).json({ success: false, error: "Not authorized for this patient" });
+}
+
+const allowedMimeTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+if (!allowedMimeTypes.has(req.file.mimetype)) {
+  return res.status(400).json({
+    success: false,
+    error: "Only JPEG, PNG, and WebP images are allowed",
+  });
+}
+
+const safeType = type === "old" ? "old" : "new";
     const ext = extFromName(req.file.originalname);
     const objectPath = `${patientId}/${safeType}/${crypto.randomUUID()}${ext}`;
     const { error } = await supabase.storage
@@ -281,8 +321,12 @@ app.get("/xray-url", requireAuth, async (req, res) => {
     if (!objectPath) {
       return res.status(400).json({ success: false, error: "path is required" });
     }
-    const patientId = String(objectPath).split("/")[0];
-    const allowed = await authorizePatientAccess(req.user.uid, patientId);
+   const validated = validateXrayPath(objectPath);
+if (!validated) {
+  return res.status(400).json({ success: false, error: "Invalid X-ray path" });
+}
+const { patientId } = validated;
+const allowed = await authorizePatientAccess(req.user.uid, patientId);
     if (!allowed) {
       return res.status(403).json({ success: false, error: "Not authorized" });
     }
@@ -308,8 +352,12 @@ app.post("/xray-delete", requireAuth, async (req, res) => {
     if (!objectPath) {
       return res.status(400).json({ success: false, error: "path is required" });
     }
-    const patientId = String(objectPath).split("/")[0];
-    const allowed = await authorizePatientAccess(req.user.uid, patientId);
+    const validated = validateXrayPath(objectPath);
+if (!validated) {
+  return res.status(400).json({ success: false, error: "Invalid X-ray path" });
+}
+const { patientId } = validated;
+const allowed = await authorizePatientAccess(req.user.uid, patientId);
     if (!allowed) {
       return res.status(403).json({ success: false, error: "Not authorized" });
     }
